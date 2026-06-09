@@ -196,7 +196,7 @@ class VolumeSelectDialog(QDialog):
         return -1
 
 
-from PyQt6.QtCore import pyqtSignal, QObject
+from PyQt6.QtCore import pyqtSignal, QObject, QSettings
 
 class LogSignals(QObject):
     log_msg = pyqtSignal(str)
@@ -415,27 +415,47 @@ class MainWindow(QMainWindow):
         self.logo_path = None
 
     def _load_fallback_keys(self):
-        # Comic Vine
-        cv_key = os.environ.get('COMIC_VINE_API_KEY')
-        if not cv_key:
-            try:
-                with open(r"C:\script\api_key.txt", 'r', encoding='utf-8') as f:
-                    cv_key = f.readline().strip()
-            except Exception:
-                pass
-        if cv_key:
-            self.vine_key.line_edit.setText(cv_key)
+        settings = QSettings("ComicSocialCreator", "ComicSocialCreator")
 
-        # Mistral
-        mistral_key = os.environ.get('MISTRAL_API_KEY')
+        # Load from QSettings first
+        cv_key = settings.value("comic_vine_api_key", "")
+        marvel_pub = settings.value("marvel_pub_key", "")
+        marvel_priv = settings.value("marvel_priv_key", "")
+        mistral_key = settings.value("mistral_api_key", "")
+
+        # Fallback for Comic Vine
+        if not cv_key:
+            cv_key = os.environ.get('COMIC_VINE_API_KEY', '')
+            if not cv_key:
+                try:
+                    with open(r"C:\script\api_key.txt", 'r', encoding='utf-8') as f:
+                        cv_key = f.readline().strip()
+                except Exception:
+                    pass
+
+        # Fallback for Mistral
         if not mistral_key:
-            try:
-                with open(r"C:\script\mistral_api_key.txt", 'r', encoding='utf-8') as f:
-                    mistral_key = f.readline().strip()
-            except Exception:
-                pass
-        if mistral_key:
-            self.mistral_key.line_edit.setText(mistral_key)
+            mistral_key = os.environ.get('MISTRAL_API_KEY', '')
+            if not mistral_key:
+                try:
+                    with open(r"C:\script\mistral_api_key.txt", 'r', encoding='utf-8') as f:
+                        mistral_key = f.readline().strip()
+                except Exception:
+                    pass
+
+        # Set values
+        if cv_key: self.vine_key.line_edit.setText(cv_key)
+        if marvel_pub: self.marvel_pub.line_edit.setText(marvel_pub)
+        if marvel_priv: self.marvel_priv.line_edit.setText(marvel_priv)
+        if mistral_key: self.mistral_key.line_edit.setText(mistral_key)
+
+    def closeEvent(self, event):
+        settings = QSettings("ComicSocialCreator", "ComicSocialCreator")
+        settings.setValue("comic_vine_api_key", self.vine_key.text())
+        settings.setValue("marvel_pub_key", self.marvel_pub.text())
+        settings.setValue("marvel_priv_key", self.marvel_priv.text())
+        settings.setValue("mistral_api_key", self.mistral_key.text())
+        super().closeEvent(event)
 
     def browse_logo(self):
         fname, _ = QFileDialog.getOpenFileName(self, 'Select Logo', '', 'Images (*.png *.jpg *.jpeg)')
