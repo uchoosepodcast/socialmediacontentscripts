@@ -2,3 +2,8 @@ __pycache__/
 output/
 *.jpg
 *.png
+dist/
+build/
+*.zip
+*.b64
+*.txt
