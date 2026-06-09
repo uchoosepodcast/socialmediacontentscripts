@@ -102,11 +102,12 @@ class RenderWorker(QThread):
     preview_ready = pyqtSignal(str, str)
     batch_finished = pyqtSignal(bool)
 
-    def __init__(self, run_config: RunConfig, issues: list, is_preview=False, target_issue=None):
+    def __init__(self, run_config: RunConfig, issues: list, is_preview=False, target_issue=None, export_dir=None):
         super().__init__()
         self.run_config = run_config
         self.issues = [target_issue] if target_issue else issues
         self.is_preview = is_preview
+        self.export_dir = export_dir or "output"
 
     def run(self):
         renderer = ImageRenderer()
@@ -140,10 +141,13 @@ class RenderWorker(QThread):
                             cover_path = tf.name
                         img.save(cover_path)
 
-                    out_path = f"output/{platform}/{issue.issue_number}_social.jpg"
                     if self.is_preview:
                         with tempfile.NamedTemporaryFile(suffix='_preview.jpg', delete=False) as tf:
                             out_path = tf.name
+                    else:
+                        base_name = f"{issue.issue_number}_{issue.name.replace(' ', '_')}" if issue.name else f"Issue_{issue.issue_number}"
+                        safe_base = "".join([c for c in base_name if c.isalpha() or c.isdigit() or c in (' ', '-', '_')]).rstrip()
+                        out_path = os.path.join(self.export_dir, f"{safe_base}_{platform}.jpg")
 
                     success = renderer.render_social_image(self.run_config, p_config, issue, cover_path, out_path)
 
@@ -387,7 +391,7 @@ class MainWindow(QMainWindow):
         plat_layout.addWidget(self.cb_ig)
         plat_layout.addWidget(self.cb_fb)
         plat_layout.addWidget(self.cb_tw)
-        plat_group.setLayout(plat_layout)
+        plat_group.content_layout.addLayout(plat_layout)
         left_layout.addWidget(plat_group)
 
         self.btn_fetch = QPushButton("1. Fetch Issues")
@@ -614,7 +618,6 @@ class MainWindow(QMainWindow):
 
     def start_batch_export(self):
         if not self.issues: return
-        self.issue_list.setEnabled(False) # Prevent preview clicks during batch run
 
         platforms = []
         if self.cb_ig.isChecked(): platforms.append("Instagram")
@@ -624,6 +627,12 @@ class MainWindow(QMainWindow):
         if not platforms:
             logging.error("Select at least one platform.")
             return
+
+        export_dir = QFileDialog.getExistingDirectory(self, "Select Export Directory")
+        if not export_dir:
+            return
+
+        self.issue_list.setEnabled(False) # Prevent preview clicks during batch run
 
         run_config = RunConfig(
             title=self.title_input.text(),
@@ -640,7 +649,7 @@ class MainWindow(QMainWindow):
         self.btn_fetch.setEnabled(False)
         self.progress_bar.setValue(0)
 
-        self.batch_worker = RenderWorker(run_config, self.issues, is_preview=False)
+        self.batch_worker = RenderWorker(run_config, self.issues, is_preview=False, export_dir=export_dir)
         self.batch_worker.progress.connect(self.update_progress)
         self.batch_worker.log_msg.connect(self.append_log)
         self.batch_worker.batch_finished.connect(self.on_batch_finished)
