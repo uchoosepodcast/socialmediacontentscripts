@@ -8,6 +8,46 @@ from core.config import AppConfig, IssueMetadata
 
 logger = logging.getLogger(__name__)
 
+import re
+
+def summarize_description(api_key: str, text: str, word_limit: int = 40) -> Optional[str]:
+    if not api_key or not text:
+        return text
+
+    MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
+    prompt = (
+        f"Summarize the following comic book plot description. Your summary MUST be {word_limit} words or fewer. "
+        f"Strictly adhere to this {word_limit}-word maximum. Output only the summary text. "
+        f"Do NOT repeat the comic title, issue number, or cover date in your summary, focus only on the plot events."
+        f"\n\nPlot Description:\n{text}"
+    )
+
+    payload = {
+        "model": "mistral-small-latest",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": int(word_limit * 2.5),
+        "temperature": 0.2
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+    try:
+        response = requests.post(MISTRAL_API_URL, headers=headers, json=payload, timeout=20)
+        response.raise_for_status()
+        data = response.json()
+        summary = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+        if summary:
+            cleaned = re.sub(r"^\s*(here's|here is|certainly, here's|sure, here's|okay, here's)\s*a summary:?\s*", "", summary, flags=re.I).strip()
+            cleaned = re.sub(r"^\s*summary:\s*", "", cleaned, flags=re.I).strip()
+            return cleaned
+    except Exception as e:
+        logger.error(f"Mistral API request failed: {e}")
+
+    return text
+
 class DataFetcher:
     def __init__(self, config: AppConfig):
         self.config = config
@@ -219,6 +259,7 @@ class GoogleBooksProvider(DataFetcher):
 
 class PipelineFetcher:
     def __init__(self, config: AppConfig, priorities: List[str]):
+        self.config = config
         self.providers = {}
         if "comicvine" in priorities:
             self.providers["comicvine"] = ComicVineProvider(config)
@@ -262,5 +303,12 @@ class PipelineFetcher:
                         issue = provider.fetch_issue_details(issue)
                         if issue.description and issue.image_url:
                             break # Found what we needed
+
+            # Use Mistral to summarize description if configured
+            if issue.description and self.config.mistral_api_key:
+                logger.info(f"Summarizing description for issue {issue.issue_number}...")
+                summarized = summarize_description(self.config.mistral_api_key, issue.description, word_limit=45)
+                if summarized:
+                    issue.description = summarized
 
         return issues

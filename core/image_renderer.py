@@ -157,20 +157,39 @@ class ImageRenderer:
             draw.multiline_text((margin, current_y), wrapped_title, font=title_font, fill=text_color)
             current_y += draw.multiline_textbbox((0,0), wrapped_title, font=title_font)[3] + 20
 
-            # Credits
+            # Credits and Published Year
+            credit_font = self._get_font(DEFAULT_FONT_REGULAR, 24)
+
+            # Published Year
+            pub_year = "Unknown"
+            if issue.cover_date:
+                # Assuming YYYY-MM-DD or similar
+                pub_year = issue.cover_date.split('-')[0]
+            elif config.start_year:
+                 pub_year = str(config.start_year)
+
+            y_text = f"Published: {pub_year}"
+            draw.text((margin, current_y), y_text, font=credit_font, fill=(50,50,50))
+            current_y += 35
+
+            writers = []
+            artists = []
             if issue.credits:
                 writers = [c['name'] for c in issue.credits if c['role'] and 'writer' in c['role'].lower()]
                 artists = [c['name'] for c in issue.credits if c['role'] and 'artist' in c['role'].lower() or 'penciler' in c['role'].lower()]
 
-                credit_font = self._get_font(DEFAULT_FONT_REGULAR, 24)
-                if writers:
-                    w_text = f"Writer: {', '.join(writers[:2])}"
-                    draw.text((margin, current_y), w_text, font=credit_font, fill=(50,50,50))
-                    current_y += 35
-                if artists:
-                    a_text = f"Artist: {', '.join(artists[:2])}"
-                    draw.text((margin, current_y), a_text, font=credit_font, fill=(50,50,50))
-                    current_y += 35
+            if not writers:
+                writers = ["Unknown"]
+            if not artists:
+                artists = ["Unknown"]
+
+            w_text = f"Writer: {', '.join(writers[:2])}"
+            draw.text((margin, current_y), w_text, font=credit_font, fill=(50,50,50))
+            current_y += 35
+
+            a_text = f"Artist: {', '.join(artists[:2])}"
+            draw.text((margin, current_y), a_text, font=credit_font, fill=(50,50,50))
+            current_y += 35
 
             current_y += 20
 
@@ -195,13 +214,22 @@ class ImageRenderer:
                     with Image.open(config.logo_image_path) as logo:
                         if logo.mode != 'RGBA':
                             logo = logo.convert('RGBA')
-                        # scale logo to max 100x100
-                        logo.thumbnail((100, 100), self.resample_filter)
-                        img.paste(logo, (margin, canvas_h - margin - logo.height), logo)
+                        # scale logo to max 150x150
+                        logo.thumbnail((150, 150), self.resample_filter)
+
+                        # Position in bottom-right of the text area
+                        # text_area_w = canvas_w - cover_area_w - (margin * 3)
+                        # The text area ends at margin + text_area_w
+                        logo_x = margin + text_area_w - logo.width
+                        logo_y = canvas_h - margin - logo.height
+
+                        img.paste(logo, (logo_x, logo_y), logo)
                 except Exception as e:
                     logger.warning(f"Failed to apply logo: {e}")
 
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            out_dir = os.path.dirname(output_path)
+            if out_dir:
+                os.makedirs(out_dir, exist_ok=True)
             img.save(output_path, quality=90)
             return True
 
