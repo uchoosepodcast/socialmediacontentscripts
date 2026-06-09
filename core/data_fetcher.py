@@ -241,9 +241,13 @@ class PipelineFetcher:
     def fetch_issues(self, volume_id: str, start_date: str, end_date: str, publisher: str = "") -> List[IssueMetadata]:
         # Baseline is always Comic Vine for the bulk list if possible, or whatever is first
         issues = []
-        primary = self.providers.get(self.priorities[0])
-        if primary:
-            issues = primary.fetch_issues(volume_id, start_date, end_date)
+        # Fallback cascade to find a provider that can bulk fetch
+        for provider_name in self.priorities:
+            provider = self.providers.get(provider_name)
+            if provider:
+                issues = provider.fetch_issues(volume_id, start_date, end_date)
+                if issues:
+                    break
 
         # Enhance with fallbacks if data is missing
         for issue in issues:

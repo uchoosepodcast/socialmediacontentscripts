@@ -267,6 +267,9 @@ class MainWindow(QMainWindow):
         self.marvel_priv = PasswordEdit()
         self.mistral_key = PasswordEdit()
 
+        # Auto-load keys if available
+        self._load_fallback_keys()
+
         cred_layout.addWidget(QLabel("Comic Vine API Key:"))
         cred_layout.addWidget(self.vine_key)
         cred_layout.addWidget(QLabel("Marvel Public Key:"))
@@ -411,6 +414,29 @@ class MainWindow(QMainWindow):
 
         self.logo_path = None
 
+    def _load_fallback_keys(self):
+        # Comic Vine
+        cv_key = os.environ.get('COMIC_VINE_API_KEY')
+        if not cv_key:
+            try:
+                with open(r"C:\script\api_key.txt", 'r', encoding='utf-8') as f:
+                    cv_key = f.readline().strip()
+            except Exception:
+                pass
+        if cv_key:
+            self.vine_key.line_edit.setText(cv_key)
+
+        # Mistral
+        mistral_key = os.environ.get('MISTRAL_API_KEY')
+        if not mistral_key:
+            try:
+                with open(r"C:\script\mistral_api_key.txt", 'r', encoding='utf-8') as f:
+                    mistral_key = f.readline().strip()
+            except Exception:
+                pass
+        if mistral_key:
+            self.mistral_key.line_edit.setText(mistral_key)
+
     def browse_logo(self):
         fname, _ = QFileDialog.getOpenFileName(self, 'Select Logo', '', 'Images (*.png *.jpg *.jpeg)')
         if fname:
@@ -531,6 +557,7 @@ class MainWindow(QMainWindow):
 
     def start_batch_export(self):
         if not self.issues: return
+        self.issue_list.setEnabled(False) # Prevent preview clicks during batch run
 
         platforms = []
         if self.cb_ig.isChecked(): platforms.append("Instagram")
@@ -556,15 +583,16 @@ class MainWindow(QMainWindow):
         self.btn_fetch.setEnabled(False)
         self.progress_bar.setValue(0)
 
-        self.render_worker = RenderWorker(run_config, self.issues, is_preview=False)
-        self.render_worker.progress.connect(self.update_progress)
-        self.render_worker.log_msg.connect(self.append_log)
-        self.render_worker.batch_finished.connect(self.on_batch_finished)
-        self.render_worker.start()
+        self.batch_worker = RenderWorker(run_config, self.issues, is_preview=False)
+        self.batch_worker.progress.connect(self.update_progress)
+        self.batch_worker.log_msg.connect(self.append_log)
+        self.batch_worker.batch_finished.connect(self.on_batch_finished)
+        self.batch_worker.start()
 
     def on_batch_finished(self, success):
         self.btn_export.setEnabled(True)
         self.btn_fetch.setEnabled(True)
+        self.issue_list.setEnabled(True)
         if success:
             logging.info("Batch export completed successfully.")
         else:
