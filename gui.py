@@ -145,9 +145,10 @@ class RenderWorker(QThread):
                         with tempfile.NamedTemporaryFile(suffix='_preview.jpg', delete=False) as tf:
                             out_path = tf.name
                     else:
-                        base_name = f"{issue.issue_number}_{issue.name.replace(' ', '_')}" if issue.name else f"Issue_{issue.issue_number}"
-                        safe_base = "".join([c for c in base_name if c.isalpha() or c.isdigit() or c in (' ', '-', '_')]).rstrip()
-                        out_path = os.path.join(self.export_dir, f"{safe_base}_{platform}.jpg")
+                        series_title = self.run_config.title.replace(' ', '_') if self.run_config.title else "Unknown_Series"
+                        base_name = f"{issue.issue_number}_{series_title}_{platform}"
+                        safe_base = "".join([c for c in base_name if c.isalnum() or c in (' ', '-', '_')]).rstrip()
+                        out_path = os.path.join(self.export_dir, f"{safe_base}.jpg")
 
                     success = renderer.render_social_image(self.run_config, p_config, issue, cover_path, out_path)
 
