@@ -166,6 +166,29 @@ class ComicVineProvider(DataFetcher):
 
         return issues
 
+    def fetch_issue_details(self, issue: IssueMetadata) -> IssueMetadata:
+        # Fetch full issue from Comic Vine to get roles and high res images
+        params = {
+            'field_list': 'description,image,person_credits'
+        }
+        data = self._make_request(f'issue/4000-{issue.id}', params)
+        if data and data.get('results'):
+            res = data['results']
+            if not issue.description and res.get('description'):
+                issue.description = res['description']
+            if res.get('image'):
+                issue.image_url = res['image'].get('super_url') or res['image'].get('original_url') or issue.image_url
+            if res.get('person_credits'):
+                credits = []
+                for credit in res['person_credits']:
+                    credits.append({
+                        'name': credit.get('name', ''),
+                        'role': credit.get('role', '')
+                    })
+                issue.credits = credits
+                issue.source = 'comicvine'
+        return issue
+
 class MarvelProvider(DataFetcher):
     BASE_URL = "https://gateway.marvel.com/v1/public"
 
@@ -203,7 +226,7 @@ class MarvelProvider(DataFetcher):
             return None
 
     def fetch_issue_details(self, issue: IssueMetadata) -> IssueMetadata:
-        # Specialized fallback to grab high res cover and description
+        # Specialized fallback to grab high res cover, description, and credits
         if not issue.name and not issue.volume_name:
             return issue
 
@@ -232,6 +255,16 @@ class MarvelProvider(DataFetcher):
             issue.image_url = f"{img['path']}.{img['extension']}"
             issue.source = 'marvel'
 
+        # Credits
+        if not any(c.get('role') for c in issue.credits) and marvel_issue.get('creators', {}).get('items'):
+            new_credits = []
+            for creator in marvel_issue['creators']['items']:
+                new_credits.append({
+                    'name': creator.get('name', ''),
+                    'role': creator.get('role', '')
+                })
+            issue.credits = new_credits
+
         return issue
 
 class GoogleBooksProvider(DataFetcher):
@@ -251,6 +284,15 @@ class GoogleBooksProvider(DataFetcher):
                 if volume_info.get('description'):
                     issue.description = volume_info['description']
                     issue.source = 'googlebooks'
+
+                if not any(c.get('role') for c in issue.credits) and volume_info.get('authors'):
+                    new_credits = []
+                    for author in volume_info['authors']:
+                        new_credits.append({
+                            'name': author,
+                            'role': 'writer'
+                        })
+                    issue.credits = new_credits
 
         except Exception as e:
             logger.error(f"Google Books API request failed: {e}")
@@ -292,8 +334,11 @@ class PipelineFetcher:
 
         # Enhance with fallbacks if data is missing
         for issue in issues:
-            if not issue.description or not issue.image_url:
-                for fallback_source in self.priorities[1:]:
+            needs_details = (not issue.description or not issue.image_url or not any(c.get('role') for c in issue.credits))
+
+            if needs_details:
+                # Try to fetch details starting from the highest priority provider
+                for fallback_source in self.priorities:
                     provider = self.providers.get(fallback_source)
                     if provider:
                         # Only use marvel fallback for Marvel comics
@@ -301,8 +346,12 @@ class PipelineFetcher:
                             continue
 
                         issue = provider.fetch_issue_details(issue)
-                        if issue.description and issue.image_url:
-                            break # Found what we needed
+
+                        has_desc = bool(issue.description)
+                        has_img = bool(issue.image_url)
+                        has_credits = any(c.get('role') for c in issue.credits)
+                        if has_desc and has_img and has_credits:
+                            break # Found everything we needed
 
             # Use Mistral to summarize description if configured
             if issue.description and self.config.mistral_api_key:

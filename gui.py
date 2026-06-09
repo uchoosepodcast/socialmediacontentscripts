@@ -236,6 +236,43 @@ class PasswordEdit(QWidget):
         return self.line_edit.text()
 
 
+
+class CollapsibleBox(QWidget):
+    def __init__(self, title="", parent=None):
+        super(CollapsibleBox, self).__init__(parent)
+
+        self.toggle_button = QPushButton(title)
+        self.toggle_button.setStyleSheet("text-align: left; padding: 5px; font-weight: bold; border: none; background-color: transparent;")
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(True)
+        self.toggle_button.clicked.connect(self.on_pressed)
+
+        # Initial arrow adjustment
+        if "▶" in title:
+            self.toggle_button.setText(title.replace("▶", "▼"))
+
+        self.content_area = QWidget()
+        self.content_layout = QVBoxLayout(self.content_area)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.addWidget(self.toggle_button)
+        main_layout.addWidget(self.content_area)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(main_layout)
+
+    def on_pressed(self):
+        checked = self.toggle_button.isChecked()
+        self.content_area.setVisible(checked)
+        title = self.toggle_button.text()
+        if checked:
+            self.toggle_button.setText(title.replace("▶", "▼"))
+        else:
+            self.toggle_button.setText(title.replace("▼", "▶"))
+
+    def setChecked(self, checked):
+        self.toggle_button.setChecked(checked)
+        self.on_pressed()
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -260,7 +297,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(left_scroll)
 
         # Credentials
-        cred_group = QGroupBox("API Credentials")
+        cred_group = CollapsibleBox("▶ API Credentials")
         cred_layout = QVBoxLayout()
         self.vine_key = PasswordEdit()
         self.marvel_pub = PasswordEdit()
@@ -278,11 +315,11 @@ class MainWindow(QMainWindow):
         cred_layout.addWidget(self.marvel_priv)
         cred_layout.addWidget(QLabel("Mistral API Key:"))
         cred_layout.addWidget(self.mistral_key)
-        cred_group.setLayout(cred_layout)
+        cred_group.content_layout.addLayout(cred_layout)
         left_layout.addWidget(cred_group)
 
         # Source Priority
-        source_group = QGroupBox("Source Priorities")
+        source_group = CollapsibleBox("▶ Source Priorities")
         source_layout = QVBoxLayout()
         self.source_combo = QComboBox()
         self.source_combo.addItems([
@@ -291,11 +328,11 @@ class MainWindow(QMainWindow):
             "ComicVine Only"
         ])
         source_layout.addWidget(self.source_combo)
-        source_group.setLayout(source_layout)
+        source_group.content_layout.addLayout(source_layout)
         left_layout.addWidget(source_group)
 
         # Search Constraints
-        search_group = QGroupBox("Search Constraints")
+        search_group = CollapsibleBox("▶ Search Constraints")
         search_layout = QVBoxLayout()
         self.title_input = QLineEdit()
         self.publisher_input = QLineEdit()
@@ -317,11 +354,11 @@ class MainWindow(QMainWindow):
         search_layout.addWidget(self.start_year)
         search_layout.addWidget(QLabel("End Year:"))
         search_layout.addWidget(self.end_year)
-        search_group.setLayout(search_layout)
+        search_group.content_layout.addLayout(search_layout)
         left_layout.addWidget(search_group)
 
         # Brand Assets
-        brand_group = QGroupBox("Brand Assets")
+        brand_group = CollapsibleBox("▶ Brand Assets")
         brand_layout = QVBoxLayout()
         self.footer_input = QLineEdit()
         self.footer_input.setMaxLength(50)
@@ -337,11 +374,11 @@ class MainWindow(QMainWindow):
         brand_layout.addWidget(self.footer_input)
         brand_layout.addWidget(QLabel("Custom Logo:"))
         brand_layout.addLayout(logo_layout)
-        brand_group.setLayout(brand_layout)
+        brand_group.content_layout.addLayout(brand_layout)
         left_layout.addWidget(brand_group)
 
         # Platforms
-        plat_group = QGroupBox("Platforms")
+        plat_group = CollapsibleBox("▶ Platforms")
         plat_layout = QVBoxLayout()
         self.cb_ig = QCheckBox("Instagram")
         self.cb_fb = QCheckBox("Facebook")
