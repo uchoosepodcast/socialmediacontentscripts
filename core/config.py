@@ -4,8 +4,6 @@ from typing import Optional, Callable, Dict, Any, List
 @dataclass
 class AppConfig:
     comic_vine_api_key: Optional[str] = None
-    marvel_public_key: Optional[str] = None
-    marvel_private_key: Optional[str] = None
     mistral_api_key: Optional[str] = None
 
 @dataclass

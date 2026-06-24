@@ -127,32 +127,14 @@ class ComicVineProvider(DataFetcher):
         return issues
 
 class MarvelProvider(DataFetcher):
-    BASE_URL = "https://gateway.marvel.com/v1/public"
+    BASE_URL = "https://marvel.emreparker.com/v1"
 
     def __init__(self, config: AppConfig):
         super().__init__(config)
-        self.public_key = config.marvel_public_key
-        self.private_key = config.marvel_private_key
 
-    def _get_auth_params(self) -> Dict[str, str]:
-        if not self.public_key or not self.private_key:
-            return {}
-        ts = str(int(time.time()))
-        hash_str = ts + self.private_key + self.public_key
-        hash_md5 = hashlib.md5(hash_str.encode('utf-8')).hexdigest()
-        return {
-            'ts': ts,
-            'apikey': self.public_key,
-            'hash': hash_md5
-        }
-
-    def _make_request(self, endpoint: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        auth = self._get_auth_params()
-        if not auth:
-            logger.warning("Marvel API keys missing.")
-            return None
-
-        params.update(auth)
+    def _make_request(self, endpoint: str, params: Dict[str, Any] = None) -> Optional[Any]:
+        if params is None:
+            params = {}
         try:
             url = f"{self.BASE_URL}/{endpoint}"
             response = requests.get(url, params=params, timeout=30)
@@ -169,16 +151,27 @@ class MarvelProvider(DataFetcher):
 
         title_query = f"{issue.volume_name or ''} {issue.name or ''}".strip()
         params = {
-            'titleStartsWith': title_query[:50], # Marvel limits title search
-            'issueNumber': issue.issue_number,
-            'limit': 1
+            'q': title_query
         }
 
-        data = self._make_request('comics', params)
-        if not data or not data.get('data', {}).get('results'):
+        # First, search for the issue
+        search_results = self._make_request('search/issues', params)
+        if not search_results or not isinstance(search_results, list):
             return issue
 
-        marvel_issue = data['data']['results'][0]
+        matched_issue_id = None
+        for item in search_results:
+            if str(item.get('issueNumber')) == str(issue.issue_number):
+                matched_issue_id = item.get('id')
+                break
+
+        if not matched_issue_id:
+            return issue
+
+        # Next, fetch the full issue details by ID
+        marvel_issue = self._make_request(f'issues/{matched_issue_id}')
+        if not marvel_issue:
+            return issue
 
         # High fidelity description
         if marvel_issue.get('description'):
@@ -186,10 +179,9 @@ class MarvelProvider(DataFetcher):
             issue.source = 'marvel'
 
         # High fidelity image
-        images = marvel_issue.get('images', [])
-        if images:
-            img = images[0]
-            issue.image_url = f"{img['path']}.{img['extension']}"
+        cover = marvel_issue.get('cover')
+        if cover and cover.get('path') and cover.get('extension'):
+            issue.image_url = f"{cover['path']}.{cover['extension']}"
             issue.source = 'marvel'
 
         return issue
