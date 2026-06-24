@@ -263,16 +263,10 @@ class MainWindow(QMainWindow):
         cred_group = QGroupBox("API Credentials")
         cred_layout = QVBoxLayout()
         self.vine_key = PasswordEdit()
-        self.marvel_pub = PasswordEdit()
-        self.marvel_priv = PasswordEdit()
         self.mistral_key = PasswordEdit()
 
         cred_layout.addWidget(QLabel("Comic Vine API Key:"))
         cred_layout.addWidget(self.vine_key)
-        cred_layout.addWidget(QLabel("Marvel Public Key:"))
-        cred_layout.addWidget(self.marvel_pub)
-        cred_layout.addWidget(QLabel("Marvel Private Key:"))
-        cred_layout.addWidget(self.marvel_priv)
         cred_layout.addWidget(QLabel("Mistral API Key:"))
         cred_layout.addWidget(self.mistral_key)
         cred_group.setLayout(cred_layout)
@@ -430,8 +424,6 @@ class MainWindow(QMainWindow):
 
         app_config = AppConfig(
             comic_vine_api_key=self.vine_key.text(),
-            marvel_public_key=self.marvel_pub.text(),
-            marvel_private_key=self.marvel_priv.text(),
             mistral_api_key=self.mistral_key.text()
         )
 
