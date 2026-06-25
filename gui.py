@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QTextEdit, QProgressBar, QFileDialog, QTabWidget,
                              QScrollArea, QListWidget, QDialog, QDialogButtonBox,
                              QToolButton, QAbstractItemView, QSplitter)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QPixmap, QIcon
 
 from core.config import AppConfig, RunConfig, PlatformConfig, IssueMetadata
@@ -235,16 +235,12 @@ class PasswordEdit(QWidget):
     def text(self):
         return self.line_edit.text()
 
-    def setText(self, text):
-        self.line_edit.setText(text)
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Comic Social Creator")
         self.resize(1200, 800)
-        self.settings = QSettings("ComicSocialCreator", "App")
         self.issues = []
 
         # Main Layout (Splitter)
@@ -267,10 +263,16 @@ class MainWindow(QMainWindow):
         cred_group = QGroupBox("API Credentials")
         cred_layout = QVBoxLayout()
         self.vine_key = PasswordEdit()
+        self.marvel_pub = PasswordEdit()
+        self.marvel_priv = PasswordEdit()
         self.mistral_key = PasswordEdit()
 
         cred_layout.addWidget(QLabel("Comic Vine API Key:"))
         cred_layout.addWidget(self.vine_key)
+        cred_layout.addWidget(QLabel("Marvel Public Key:"))
+        cred_layout.addWidget(self.marvel_pub)
+        cred_layout.addWidget(QLabel("Marvel Private Key:"))
+        cred_layout.addWidget(self.marvel_priv)
         cred_layout.addWidget(QLabel("Mistral API Key:"))
         cred_layout.addWidget(self.mistral_key)
         cred_group.setLayout(cred_layout)
@@ -408,23 +410,6 @@ class MainWindow(QMainWindow):
         logging.getLogger().setLevel(logging.INFO)
 
         self.logo_path = None
-        self.load_settings()
-
-    def load_settings(self):
-        vine = self.settings.value("comic_vine_api_key", "")
-        if vine:
-            self.vine_key.setText(str(vine))
-        mistral = self.settings.value("mistral_api_key", "")
-        if mistral:
-            self.mistral_key.setText(str(mistral))
-
-    def save_settings(self):
-        self.settings.setValue("comic_vine_api_key", self.vine_key.text())
-        self.settings.setValue("mistral_api_key", self.mistral_key.text())
-
-    def closeEvent(self, event):
-        self.save_settings()
-        super().closeEvent(event)
 
     def browse_logo(self):
         fname, _ = QFileDialog.getOpenFileName(self, 'Select Logo', '', 'Images (*.png *.jpg *.jpeg)')
@@ -445,6 +430,8 @@ class MainWindow(QMainWindow):
 
         app_config = AppConfig(
             comic_vine_api_key=self.vine_key.text(),
+            marvel_public_key=self.marvel_pub.text(),
+            marvel_private_key=self.marvel_priv.text(),
             mistral_api_key=self.mistral_key.text()
         )
 
