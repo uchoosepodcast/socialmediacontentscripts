@@ -184,6 +184,15 @@ class MarvelProvider(DataFetcher):
             issue.image_url = f"{cover['path']}.{cover['extension']}"
             issue.source = 'marvel'
 
+        # Extract Creators/Credits
+        if not issue.credits and marvel_issue.get('creators'):
+            issue.credits = []
+            for creator in marvel_issue['creators']:
+                issue.credits.append({
+                    'name': creator.get('name'),
+                    'role': creator.get('role')
+                })
+
         return issue
 
 class GoogleBooksProvider(DataFetcher):
