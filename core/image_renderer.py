@@ -159,16 +159,47 @@ class ImageRenderer:
 
             # Credits
             if issue.credits:
-                writers = [c['name'] for c in issue.credits if c['role'] and 'writer' in c['role'].lower()]
-                artists = [c['name'] for c in issue.credits if c['role'] and 'artist' in c['role'].lower() or 'penciler' in c['role'].lower()]
+                writers = []
+                artists = []
+                fallback_names = []
+
+                for c in issue.credits:
+                    role = c.get('role', '')
+                    name = c.get('name', '')
+
+                    if not name:
+                        continue
+
+                    if role:
+                        role_lower = role.lower()
+                        if 'writer' in role_lower or 'script' in role_lower or 'author' in role_lower:
+                            writers.append(name)
+                        elif any(kw in role_lower for kw in ['artist', 'pencil', 'illustrat', 'ink', 'color', 'paint']):
+                            artists.append(name)
+                        else:
+                            fallback_names.append(name)
+                    else:
+                        fallback_names.append(name)
+
+                # Deduplicate and limit to 2
+                writers = list(dict.fromkeys(writers))[:2]
+                artists = list(dict.fromkeys(artists))[:2]
+                fallback_names = list(dict.fromkeys(fallback_names))
+
+                # If no writers/artists found, try to use fallbacks
+                if not writers and not artists and fallback_names:
+                    # Just split the fallbacks, e.g. first one as writer, second as artist for display purposes,
+                    # or just display a generic "Creators" field.
+                    writers = fallback_names[:1]
+                    artists = fallback_names[1:3]
 
                 credit_font = self._get_font(DEFAULT_FONT_REGULAR, 24)
                 if writers:
-                    w_text = f"Writer: {', '.join(writers[:2])}"
+                    w_text = f"Writer: {', '.join(writers)}"
                     draw.text((margin, current_y), w_text, font=credit_font, fill=(50,50,50))
                     current_y += 35
                 if artists:
-                    a_text = f"Artist: {', '.join(artists[:2])}"
+                    a_text = f"Artist: {', '.join(artists)}"
                     draw.text((margin, current_y), a_text, font=credit_font, fill=(50,50,50))
                     current_y += 35
 
@@ -177,7 +208,7 @@ class ImageRenderer:
             # Description
             if issue.description:
                 desc_clean = re.sub(r'<[^>]+>', '', issue.description)
-                max_desc_h = canvas_h - current_y - margin - 50 # 50 for footer
+                max_desc_h = canvas_h - current_y - margin - 150 # 150 to ensure it doesn't overlap the logo
 
                 desc_font, wrapped_desc, _ = self._auto_scale_text(
                     desc_clean, DEFAULT_FONT_REGULAR, text_area_w, max_desc_h, start_size=32, min_size=18
