@@ -106,7 +106,8 @@ class ComicVineProvider(DataFetcher):
             img_url = issue_dict.get('image', {}).get('super_url') or issue_dict.get('image', {}).get('original_url')
 
             credits = []
-            for credit in issue_dict.get('person_credits', []):
+            person_credits = issue_dict.get('person_credits') or []
+            for credit in person_credits:
                 credits.append({
                     'name': credit.get('name'),
                     'role': credit.get('role')
@@ -192,6 +193,19 @@ class MarvelProvider(DataFetcher):
             issue.image_url = f"{img['path']}.{img['extension']}"
             issue.source = 'marvel'
 
+        # Fetch credits if missing
+        if not issue.credits:
+            creators = marvel_issue.get('creators', {}).get('items', [])
+            if creators:
+                credits_list = []
+                for c in creators:
+                    credits_list.append({
+                        'name': c.get('name'),
+                        'role': c.get('role')
+                    })
+                issue.credits = credits_list
+                issue.source = 'marvel'
+
         return issue
 
 class GoogleBooksProvider(DataFetcher):
@@ -247,7 +261,7 @@ class PipelineFetcher:
 
         # Enhance with fallbacks if data is missing
         for issue in issues:
-            if not issue.description or not issue.image_url:
+            if not issue.description or not issue.image_url or not issue.credits:
                 for fallback_source in self.priorities[1:]:
                     provider = self.providers.get(fallback_source)
                     if provider:
@@ -256,7 +270,7 @@ class PipelineFetcher:
                             continue
 
                         issue = provider.fetch_issue_details(issue)
-                        if issue.description and issue.image_url:
+                        if issue.description and issue.image_url and issue.credits:
                             break # Found what we needed
 
         return issues
