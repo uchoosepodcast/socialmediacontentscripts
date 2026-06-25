@@ -172,11 +172,15 @@ class ImageRenderer:
 
                     if role:
                         role_lower = role.lower()
+                        matched = False
                         if 'writer' in role_lower or 'script' in role_lower or 'author' in role_lower:
                             writers.append(name)
-                        elif any(kw in role_lower for kw in ['artist', 'pencil', 'illustrat', 'ink', 'color', 'paint']):
+                            matched = True
+                        if any(kw in role_lower for kw in ['artist', 'pencil', 'illustrat', 'ink', 'color', 'paint']):
                             artists.append(name)
-                        else:
+                            matched = True
+
+                        if not matched:
                             fallback_names.append(name)
                     else:
                         fallback_names.append(name)
@@ -208,7 +212,7 @@ class ImageRenderer:
             # Description
             if issue.description:
                 desc_clean = re.sub(r'<[^>]+>', '', issue.description)
-                max_desc_h = canvas_h - current_y - margin - 150 # 150 to ensure it doesn't overlap the logo
+                max_desc_h = canvas_h - current_y - margin - 50 # 50 for footer
 
                 desc_font, wrapped_desc, _ = self._auto_scale_text(
                     desc_clean, DEFAULT_FONT_REGULAR, text_area_w, max_desc_h, start_size=32, min_size=18
